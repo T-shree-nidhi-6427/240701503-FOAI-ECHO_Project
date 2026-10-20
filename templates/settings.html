@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Settings</p>
+    <h1 class="page-title">Make ECHO yours</h1>
+    <p class="page-sub">Everything here is stored locally in this prototype.</p>
+  </div>
+</header>
+
+<div class="settings-grid">
+  <section class="card" aria-labelledby="profileTitle">
+    <h2 class="card-title" id="profileTitle">{{ icon('home') }}Profile</h2>
+    <label class="field" for="profileName">Your first name (used in the greeting)
+      <input class="input" id="profileName" maxlength="40" value="{{ settings.profile_name }}" placeholder="Optional">
+    </label>
+    <div style="display:flex; justify-content:flex-end; margin-top:12px"><button class="btn btn-sm" id="saveProfile">{{ icon('check') }}Save</button></div>
+  </section>
+
+  <section class="card" aria-labelledby="notifTitle">
+    <h2 class="card-title" id="notifTitle">{{ icon('bell') }}Notification preferences</h2>
+    <div class="setting-row">
+      <div><p>In-app reminders</p><p class="sub">Show a notice when you open ECHO and a reminder is due.</p></div>
+      <label class="switch"><input type="checkbox" id="notifInapp" {% if settings.notif_inapp %}checked{% endif %} aria-label="In-app reminders"><span></span></label>
+    </div>
+    <div class="setting-row">
+      <div><p>Browser notifications</p><p class="sub">Also show a system notification while ECHO is open (asks your browser for permission).</p></div>
+      <label class="switch"><input type="checkbox" id="notifBrowser" {% if settings.notif_browser %}checked{% endif %} aria-label="Browser notifications"><span></span></label>
+    </div>
+  </section>
+
+  <section class="card span-2" aria-labelledby="rulesTitle">
+    <h2 class="card-title" id="rulesTitle">{{ icon('clock') }}Default reminder timings</h2>
+    <p class="muted" style="font-size:13px; margin-bottom:14px">How many days before the important date ECHO should remind you. Applies to new memories; existing ones keep their reminder until you change it.</p>
+    <div class="rules-grid">
+      {% for key, label in category_labels.items() %}
+      <label class="field">{{ label }}
+        <input class="input" type="number" min="0" max="365" data-rule="{{ key }}" value="{{ settings.reminder_rules.get(key, 7) }}">
+      </label>
+      {% endfor %}
+    </div>
+    <div style="display:flex; justify-content:flex-end; margin-top:14px"><button class="btn btn-sm" id="saveRules">{{ icon('check') }}Save timings</button></div>
+  </section>
+
+  <section class="card" aria-labelledby="appearTitle">
+    <h2 class="card-title" id="appearTitle">{{ icon('sparkle') }}Appearance</h2>
+    <div class="setting-row">
+      <div><p>Accent colour</p><p class="sub">Violet or teal highlights.</p></div>
+      <div class="swatches">
+        <button class="swatch swatch-violet" data-accent="violet" aria-label="Violet accent" aria-pressed="{{ 'true' if settings.accent == 'violet' else 'false' }}"></button>
+        <button class="swatch swatch-teal" data-accent="teal" aria-label="Teal accent" aria-pressed="{{ 'true' if settings.accent == 'teal' else 'false' }}"></button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div><p>Reduce motion</p><p class="sub">Turn off animations.</p></div>
+      <label class="switch"><input type="checkbox" id="reduceMotion" {% if settings.reduce_motion %}checked{% endif %} aria-label="Reduce motion"><span></span></label>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="demoTitle">
+    <h2 class="card-title" id="demoTitle">{{ icon('layers') }}Demo mode</h2>
+    <p class="muted" style="font-size:14px">Four sample memories (warranty, food, subscription, medicine) created from sample text through the real pipeline. They are labelled <span class="demo-tag">Demo data</span> everywhere.</p>
+    <p style="margin:12px 0; font-size:14px">Currently loaded: <strong id="demoCount">{{ demo_count }}</strong></p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" id="loadDemo">{{ icon('plus') }}Load demo data</button>
+      <button class="btn btn-danger btn-sm" id="clearDemo">{{ icon('trash') }}Remove demo data</button>
+    </div>
+  </section>
+
+  <section class="card span-2" aria-labelledby="statusTitle">
+    <h2 class="card-title" id="statusTitle">{{ icon('cpu') }}System status</h2>
+    <div class="status-list" id="statusList">
+      <div class="status-item">{{ icon('scan') }}<div class="grow"><p>OCR (Tesseract)</p><p class="sub" id="ocrSub">Checking...</p></div><span class="pill pill-none" id="ocrPill"><span class="dot"></span>Checking</span></div>
+      <div class="status-item">{{ icon('database') }}<div class="grow"><p>Database (SQLite)</p><p class="sub">Stored locally in database/echo.db</p></div><span class="pill pill-none" id="dbPill"><span class="dot"></span>Checking</span></div>
+      <div class="status-item">{{ icon('cpu') }}<div class="grow"><p>AI classifier (local)</p>
+        <p class="sub" id="clfSub">{% if classifier_meta %}{{ classifier_meta.model }} · trained on {{ classifier_meta.n_samples }} examples · 5-fold CV accuracy {{ (classifier_meta.cv_accuracy * 100)|round(1) }}%{% endif %}</p></div>
+        <span class="pill pill-none" id="clfPill"><span class="dot"></span>Checking</span></div>
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:14px; flex-wrap:wrap">
+      <p class="muted" style="font-size:12px">Cross-validation accuracy is measured on the bundled examples; real photos with poor OCR will score lower.</p>
+      <div style="display:flex; gap:8px">
+        <button class="btn btn-sm" id="refreshStatus">{{ icon('refresh') }}Refresh</button>
+        <button class="btn btn-sm" id="retrainBtn">{{ icon('cpu') }}Retrain classifier</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card span-2" aria-labelledby="privTitle">
+    <h2 class="card-title" id="privTitle">{{ icon('lock') }}Privacy</h2>
+    <p class="muted" style="font-size:14px">Your uploaded memories are stored locally in this prototype. Images never leave this computer: OCR, classification and reminders all run locally, with no cloud services or paid APIs. Document numbers are masked to their last four characters.</p>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const save = (payload, msg) => Echo.api('/api/settings', { method: 'POST', body: payload }).then(r => { if (r.ok && msg) Echo.toast(msg); return r; });
+  document.getElementById('saveProfile').addEventListener('click', () => save({ profile_name: document.getElementById('profileName').value }, 'Profile saved.'));
+  document.getElementById('notifInapp').addEventListener('change', e => save({ notif_inapp: e.target.checked }, 'Notification preference saved.'));
+  document.getElementById('notifBrowser').addEventListener('change', async e => {
+    if (e.target.checked && 'Notification' in window && Notification.permission !== 'granted') {
+      const p = await Notification.requestPermission();
+      if (p !== 'granted') { e.target.checked = false; Echo.toast('Browser notifications were not allowed.', 'warn'); return; }
+    } else if (e.target.checked && !('Notification' in window)) {
+      e.target.checked = false; Echo.toast('This browser does not support notifications.', 'warn'); return;
+    }
+    save({ notif_browser: e.target.checked }, 'Notification preference saved.');
+  });
+  document.getElementById('saveRules').addEventListener('click', () => {
+    const rules = {};
+    document.querySelectorAll('[data-rule]').forEach(i => rules[i.dataset.rule] = i.value);
+    save({ reminder_rules: rules }, 'Default reminder timings saved.');
+  });
+  document.querySelectorAll('[data-accent]').forEach(b => b.addEventListener('click', () => {
+    document.documentElement.dataset.accent = b.dataset.accent;
+    document.querySelectorAll('[data-accent]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    save({ accent: b.dataset.accent }, 'Accent updated.');
+  }));
+  document.getElementById('reduceMotion').addEventListener('change', e => {
+    if (e.target.checked) document.documentElement.dataset.reduceMotion = 'true'; else delete document.documentElement.dataset.reduceMotion;
+    save({ reduce_motion: e.target.checked }, 'Motion preference saved.');
+  });
+  document.getElementById('loadDemo').addEventListener('click', async () => {
+    const r = await Echo.api('/api/demo/load', { method: 'POST' });
+    if (r.ok) { Echo.toast(r.message); setTimeout(() => location.reload(), 700); }
+  });
+  document.getElementById('clearDemo').addEventListener('click', async () => {
+    const r = await Echo.api('/api/demo/clear', { method: 'POST' });
+    if (r.ok) { Echo.toast(r.message); setTimeout(() => location.reload(), 700); }
+  });
+  function pill(el, ok, yes, no) {
+    el.className = 'pill ' + (ok ? 'pill-done' : 'pill-overdue');
+    el.innerHTML = '<span class="dot"></span>' + (ok ? yes : no);
+  }
+  async function refresh() {
+    const h = await Echo.api('/api/health', {}, { quiet: true });
+    if (!h || h.status !== 'ok') return;
+    pill(document.getElementById('ocrPill'), h.ocr, 'Connected', 'Not detected');
+    document.getElementById('ocrSub').textContent = h.ocr ? `Tesseract ${h.ocr_version}` : h.ocr_message;
+    pill(document.getElementById('dbPill'), h.database, 'Connected', 'Error');
+    pill(document.getElementById('clfPill'), h.classifier, 'Ready', 'Not ready');
+  }
+  document.getElementById('refreshStatus').addEventListener('click', () => refresh().then(() => Echo.toast('Status refreshed.')));
+  document.getElementById('retrainBtn').addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    const r = await Echo.api('/api/retrain', { method: 'POST' });
+    e.target.disabled = false;
+    if (r.ok) {
+      document.getElementById('clfSub').textContent = `${r.meta.model} · trained on ${r.meta.n_samples} examples · 5-fold CV accuracy ${(r.meta.cv_accuracy * 100).toFixed(1)}%`;
+      Echo.toast('Classifier retrained.');
+    }
+  });
+  refresh();
+})();
+</script>
+{% endblock %}

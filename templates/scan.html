@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Scan{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Scan</p>
+    <h1 class="page-title">What's worth remembering?</h1>
+    <p class="page-sub">Give ECHO a photo. We'll figure out the rest.</p>
+  </div>
+</header>
+
+<div class="scan-layout">
+  <section>
+    <div class="tabs" role="tablist" aria-label="Input type">
+      <button class="tab" role="tab" id="tabImage" aria-selected="true" aria-controls="panelImage">{{ icon('image') }}Image</button>
+      <button class="tab" role="tab" id="tabDemo" aria-selected="false" aria-controls="panelDemo">{{ icon('text') }}Demo text</button>
+    </div>
+
+    <!-- REAL IMAGE OCR -->
+    <div id="panelImage" role="tabpanel" aria-labelledby="tabImage">
+      {% if not ocr.available %}
+      <div class="notice notice-warn" style="margin-bottom:14px">
+        {{ icon('alert') }}
+        <div><strong>{{ ocr.message }}</strong>
+          ECHO can't read images until Tesseract is installed (see README → “Installing Tesseract on Windows”).
+          You can still try the full pipeline with <button class="btn btn-ghost btn-sm" type="button" data-switch-demo>demo text</button>.</div>
+      </div>
+      {% endif %}
+      <div class="dropzone" id="dropzone">
+        <div class="dropzone-icon">{{ icon('upload') }}</div>
+        <h2>Capture something important</h2>
+        <p>Drop an image here or choose a file</p>
+        <div class="dropzone-actions">
+          <label class="btn btn-primary" for="fileInput">{{ icon('image') }}Choose image</label>
+          <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" class="visually-hidden">
+          <button class="btn" type="button" id="cameraBtn">{{ icon('camera') }}Use camera</button>
+        </div>
+        <p class="formats">PNG, JPG, JPEG or WEBP · up to {{ max_mb }} MB</p>
+      </div>
+
+      <div class="camera" id="camera">
+        <video id="video" autoplay playsinline muted aria-label="Camera preview"></video>
+        <canvas id="canvas" hidden></canvas>
+        <div class="camera-actions">
+          <button class="btn btn-primary" type="button" id="captureBtn">{{ icon('camera') }}Capture photo</button>
+          <button class="btn btn-ghost" type="button" id="closeCameraBtn">Cancel</button>
+        </div>
+      </div>
+
+      <div class="preview" id="preview">
+        <div class="preview-frame" id="previewFrame">
+          <img id="previewImg" alt="Preview of the image to scan">
+          <div class="scan-line" aria-hidden="true"></div>
+        </div>
+        <div class="preview-bar">
+          <span class="preview-name" id="previewName"></span>
+          <div style="display:flex; gap:8px">
+            <button class="btn btn-ghost btn-sm" type="button" id="clearBtn">{{ icon('x') }}Remove</button>
+            <button class="btn btn-primary" type="button" id="analyzeBtn" {% if not ocr.available %}disabled title="Tesseract OCR is not installed or configured."{% endif %}>{{ icon('sparkle') }}Let ECHO understand it</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEMO TEXT INPUT -->
+    <div id="panelDemo" role="tabpanel" aria-labelledby="tabDemo" hidden class="demo-panel">
+      <div class="notice notice-info" style="margin-bottom:14px">
+        {{ icon('info') }}
+        <div><strong>Demo text input - not OCR</strong>Paste or pick sample text to demonstrate the AI extraction pipeline without a camera or Tesseract. Results are clearly labelled as demo input.</div>
+      </div>
+      <div class="chips" style="margin:0 0 12px">
+        {% for key, d in demos.items() %}
+        <button class="chip" type="button" data-demo="{{ key }}" aria-pressed="false">{{ d.label }}</button>
+        {% endfor %}
+      </div>
+      <label class="field" for="demoText">Sample text
+        <textarea id="demoText" class="textarea" placeholder="e.g. Samsung Washing Machine&#10;Purchased: 15 March 2026&#10;Warranty: 2 years"></textarea>
+      </label>
+      <div style="display:flex; justify-content:flex-end; margin-top:12px">
+        <button class="btn btn-primary" type="button" id="analyzeTextBtn">{{ icon('sparkle') }}Let ECHO understand it</button>
+      </div>
+      <script type="application/json" id="demoData">{{ demos|tojson }}</script>
+    </div>
+  </section>
+
+  <aside class="card side-card" aria-live="polite">
+    <div id="howPanel">
+      <h3>How ECHO reads a memory</h3>
+      <ol class="how-list">
+        <li><div><strong>Optical Character Recognition</strong><br>Tesseract reads the visible text on your device.</div></li>
+        <li><div><strong>Local ML classifier</strong><br>Decides what it is: warranty, food, document, subscription, receipt, medicine or other.</div></li>
+        <li><div><strong>Intelligent information extraction</strong><br>Finds names, dates, durations and quantities.</div></li>
+        <li><div><strong>Rule-based temporal reasoning</strong><br>Works out the date that matters and when to remind you. It never invents missing facts.</div></li>
+      </ol>
+    </div>
+    <div id="processPanel" hidden>
+      <h3>Working on it</h3>
+      <div class="process" id="steps">
+        <div class="step" data-step="0"><span class="step-mark">{{ icon('check') }}</span>Reading your memory...</div>
+        <div class="step" data-step="1"><span class="step-mark">{{ icon('check') }}</span>Understanding context...</div>
+        <div class="step" data-step="2"><span class="step-mark">{{ icon('check') }}</span>Finding what matters...</div>
+        <div class="step" data-step="3"><span class="step-mark">{{ icon('check') }}</span>Creating your reminder...</div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- AI RESULT -->
+<section class="result" id="result" aria-labelledby="resultTitle">
+  <div class="result-head">
+    <div>
+      <h2 id="resultTitle">Here's what ECHO found.</h2>
+      <p class="page-sub" id="resultSource"></p>
+    </div>
+    <span id="sourceBadge"></span>
+  </div>
+  <div class="result-grid">
+    <div class="card">
+      <div class="result-title-row">
+        <span class="cat-icon" id="resCatIcon"><svg class="icon"><use href="#i-box"></use></svg></span>
+        <div style="flex:1; min-width:0">
+          <p class="muted" id="resCategoryLabel">Category</p>
+          <h3 class="result-title" id="resTitle"></h3>
+          <input class="input result-title-input" id="resTitleInput" aria-label="Title" hidden>
+        </div>
+      </div>
+      <dl class="kv">
+        <dt>Category</dt>
+        <dd><span id="resCategory"></span>
+          <select class="select" id="resCategorySelect" aria-label="Category" hidden>
+            {% for key, label in category_labels.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+          </select></dd>
+        <dt>Confidence</dt>
+        <dd>
+          <div class="confidence"><span id="resConfLevel"></span><div class="meter" aria-hidden="true"><span id="resConfBar"></span></div><span class="muted" id="resConfPct"></span></div>
+          <p class="conf-breakdown" id="resConfBreakdown"></p>
+        </dd>
+      </dl>
+      <div class="key-date" id="resKeyDate">
+        {{ icon('calendar') }}
+        <div><p class="key-date-sub" id="resDateLabel">Important date</p>
+          <p class="key-date-value" id="resDate"></p>
+          <p class="key-date-sub" id="resDateMethod"></p></div>
+      </div>
+      <dl class="kv">
+        <dt>Why it matters</dt><dd id="resWhy"></dd>
+        <dt>Suggested reminder</dt>
+        <dd><span id="resReminder"></span>
+          <span id="resReminderEdit" hidden><input class="input" id="resDaysBefore" type="number" min="0" max="365" style="width:90px; display:inline-block" aria-label="Days before"> days before</span></dd>
+      </dl>
+      <div id="confirmBox" class="confirm-box" hidden>
+        <h3>{{ icon('alert') }}Needs confirmation</h3>
+        <p class="hint">ECHO won't guess. Fill in only what's missing and it will recalculate.</p>
+        <div class="field-row" id="confirmFields"></div>
+        <div style="display:flex; justify-content:flex-end; margin-top:12px">
+          <button class="btn btn-sm" type="button" id="recalcBtn">{{ icon('refresh') }}Recalculate</button>
+        </div>
+      </div>
+    </div>
+    <div class="stack">
+      <div class="card">
+        <h2 class="card-title">{{ icon('layers') }}Extracted information</h2>
+        <dl class="kv" id="resFields"></dl>
+      </div>
+      <div class="card">
+        <h2 class="card-title">{{ icon('sparkle') }}Why ECHO decided this</h2>
+        <ul class="explain" id="resExplain"></ul>
+        <details style="margin-top:14px"><summary id="rawSummary">Show the text ECHO read</summary><div class="ocr-text" id="resText"></div></details>
+      </div>
+    </div>
+  </div>
+  <div class="result-actions">
+    <button class="btn btn-ghost" type="button" id="discardBtn">{{ icon('x') }}Discard</button>
+    <button class="btn" type="button" id="editBtn">{{ icon('edit') }}Edit</button>
+    <button class="btn btn-primary" type="button" id="saveBtn">{{ icon('check') }}Save memory</button>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>window.ECHO_OCR = {{ ocr.available|tojson }};</script>
+<script src="{{ url_for('static', filename='js/scan.js') }}"></script>
+{% endblock %}

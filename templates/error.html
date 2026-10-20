@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Something went wrong{% endblock %}
+{% block content %}
+<div class="error-page">
+  <p class="error-code">{{ code }}</p>
+  <h1 class="page-title" style="margin-top:8px">{{ message }}</h1>
+  <p class="page-sub">Nothing you saved has been lost.</p>
+  <div style="display:flex; gap:10px; justify-content:center; margin-top:24px">
+    <a class="btn btn-primary" href="{{ url_for('index') }}">{{ icon('home') }}Back to overview</a>
+    <a class="btn" href="{{ url_for('memories_page') }}">{{ icon('layers') }}Memories</a>
+  </div>
+</div>
+{% endblock %}

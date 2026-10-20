@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# ECHO runtime data (recreated automatically)
+database/echo.db
+models/*.joblib
+logs/
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Editors / OS
+.vscode/*
+!.vscode/launch.json
+.idea/
+.DS_Store
+Thumbs.db

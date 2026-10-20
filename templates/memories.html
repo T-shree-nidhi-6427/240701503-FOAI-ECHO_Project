@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, memory_card, empty_state %}
+{% block title %}Memories{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Memories</p>
+    <h1 class="page-title">Everything ECHO remembers</h1>
+    <p class="page-sub">Your everyday information, brought back when it matters.</p>
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('scan') }}">{{ icon('plus') }}Scan something</a>
+</header>
+
+{% if memories %}
+<div class="toolbar" role="search">
+  <div class="search">{{ icon('search') }}
+    <label for="memSearch" class="visually-hidden">Search memories</label>
+    <input id="memSearch" type="search" placeholder="Search memories" autocomplete="off">
+  </div>
+  <label class="visually-hidden" for="memCategory">Category</label>
+  <select id="memCategory" class="select">
+    <option value="">All categories</option>
+    {% for key, label in category_labels.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+  </select>
+  <label class="visually-hidden" for="memSort">Sort</label>
+  <select id="memSort" class="select">
+    <option value="soonest">Soonest date</option>
+    <option value="newest">Newest first</option>
+    <option value="title">Title A-Z</option>
+  </select>
+  <div class="segmented" role="group" aria-label="Layout">
+    <button type="button" id="gridView" aria-pressed="true" aria-label="Grid view">{{ icon('grid') }}</button>
+    <button type="button" id="listView" aria-pressed="false" aria-label="List view">{{ icon('list') }}</button>
+  </div>
+</div>
+<div class="memory-grid" id="memoryGrid">
+  {% for m in memories %}{{ memory_card(m) }}{% endfor %}
+</div>
+<div id="noResults" hidden>{{ empty_state("No matches", "Try a different search or category.", icon_name='search') }}</div>
+{% else %}
+{{ empty_state("No memories yet", "Scan a warranty card, food label, receipt or renewal notice and ECHO will keep track of it for you.", url_for('scan'), "Scan something", 'layers') }}
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const grid = document.getElementById('memoryGrid');
+  if (!grid) return;
+  const search = document.getElementById('memSearch');
+  const cat = document.getElementById('memCategory');
+  const sort = document.getElementById('memSort');
+  const noResults = document.getElementById('noResults');
+  const cards = Array.from(grid.children);
+
+  function apply() {
+    const q = search.value.trim().toLowerCase();
+    let visible = 0;
+    cards.forEach(c => {
+      const show = (!q || c.dataset.title.includes(q)) && (!cat.value || c.dataset.category === cat.value);
+      c.hidden = !show; if (show) visible++;
+    });
+    const sorted = [...cards].sort((a, b) => {
+      if (sort.value === 'title') return a.dataset.title.localeCompare(b.dataset.title);
+      if (sort.value === 'newest') return b.dataset.created.localeCompare(a.dataset.created);
+      return a.dataset.date.localeCompare(b.dataset.date);
+    });
+    sorted.forEach(c => grid.appendChild(c));
+    noResults.hidden = visible !== 0;
+  }
+  [search, cat, sort].forEach(el => el.addEventListener('input', apply));
+  const gridBtn = document.getElementById('gridView'), listBtn = document.getElementById('listView');
+  function setView(list) {
+    grid.classList.toggle('list-view', list);
+    gridBtn.setAttribute('aria-pressed', String(!list)); listBtn.setAttribute('aria-pressed', String(list));
+    try { localStorage.setItem('echo-view', list ? 'list' : 'grid'); } catch (e) {}
+  }
+  gridBtn.addEventListener('click', () => setView(false));
+  listBtn.addEventListener('click', () => setView(true));
+  try { if (localStorage.getItem('echo-view') === 'list') setView(true); } catch (e) {}
+  apply();
+})();
+</script>
+{% endblock %}

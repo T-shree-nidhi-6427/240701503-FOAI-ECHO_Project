@@ -1,0 +1,64 @@
+{# Reusable UI pieces #}
+{% set CAT_ICON = {'warranty':'shield','food':'food','document':'doc','subscription':'repeat','receipt':'receipt','medicine':'pill','other':'box'} %}
+
+{% macro icon(name, cls='') -%}
+<svg class="icon {{ cls }}" aria-hidden="true" focusable="false"><use href="#i-{{ name }}"></use></svg>
+{%- endmacro %}
+
+{% macro cat_badge(category) -%}
+<span class="cat-icon cat-{{ category }}" aria-hidden="true">{{ icon(CAT_ICON.get(category, 'box')) }}</span>
+{%- endmacro %}
+
+{% macro urgency_pill(level, label=None) -%}
+{% set text = label or {'OVERDUE':'Overdue','TODAY':'Today','URGENT':'Urgent','UPCOMING':'Upcoming','LATER':'Later','NONE':'No date'}[level] %}
+<span class="pill pill-{{ level|lower }}"><span class="dot" aria-hidden="true"></span>{{ text }}</span>
+{%- endmacro %}
+
+{% macro memory_card(m) -%}
+<a class="memory-card card-link" href="{{ url_for('memory_detail', memory_id=m.id) }}"
+   data-title="{{ m.title|lower }}" data-category="{{ m.category }}"
+   data-date="{{ m.important_date or '9999-12-31' }}" data-created="{{ m.created_at }}"
+   data-urgency="{{ m.urgency }}">
+  <div class="memory-card-top">
+    {{ cat_badge(m.category) }}
+    <div class="memory-card-head">
+      <h3 class="memory-title">{{ m.title }}</h3>
+      <p class="memory-cat">{{ m.category_label }}{% if m.is_demo %} · <span class="demo-tag">Demo data</span>{% endif %}</p>
+    </div>
+  </div>
+  <dl class="memory-meta">
+    <div>
+      <dt>{{ m.date_label }}</dt>
+      <dd>{% if m.important_date %}{{ m.important_date|short_date }}{% else %}<span class="muted">Not set</span>{% endif %}</dd>
+    </div>
+    <div>
+      <dt>Status</dt>
+      <dd>{{ urgency_pill(m.urgency, m.status_label) }}</dd>
+    </div>
+  </dl>
+  {% if m.important_date %}<p class="memory-foot">{{ m.relative }}</p>{% endif %}
+</a>
+{%- endmacro %}
+
+{% macro attention_row(m) -%}
+<a class="attention-row card-link" href="{{ url_for('memory_detail', memory_id=m.id) }}">
+  {{ cat_badge(m.category) }}
+  <div class="attention-body">
+    <p class="attention-title">{{ m.title }}</p>
+    <p class="attention-sub">{{ m.event_phrase|capitalize }}</p>
+  </div>
+  <div class="attention-side">
+    {{ urgency_pill(m.urgency) }}
+    <span class="attention-date">{{ m.important_date|short_date }}</span>
+  </div>
+</a>
+{%- endmacro %}
+
+{% macro empty_state(title, text, cta_url=None, cta_label=None, icon_name='sparkle') -%}
+<div class="empty-state">
+  <span class="empty-icon">{{ icon(icon_name) }}</span>
+  <h3>{{ title }}</h3>
+  <p>{{ text }}</p>
+  {% if cta_url %}<a class="btn btn-primary" href="{{ cta_url }}">{{ icon('plus') }}{{ cta_label }}</a>{% endif %}
+</div>
+{%- endmacro %}

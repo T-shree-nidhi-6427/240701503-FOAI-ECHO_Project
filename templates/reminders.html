@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, cat_badge, urgency_pill, empty_state %}
+{% block title %}Reminders{% endblock %}
+
+{% macro rem_item(m) -%}
+<div class="rem-item {% if m.reminder_status == 'done' %}done{% endif %}">
+  {{ cat_badge(m.category) }}
+  <div class="rem-body">
+    <p class="rem-text">{{ m.reminder_phrase }}</p>
+    <p class="rem-sub">
+      <span>{{ icon('clock') }}{{ m.relative }}</span>
+      <span>{{ icon('calendar') }}{{ m.important_date|long_date }}</span>
+      <span>{{ icon('bell') }}Reminder {{ m.reminder_date|short_date }}</span>
+      {% if m.is_demo %}<span class="demo-tag">Demo data</span>{% endif %}
+    </p>
+  </div>
+  <div class="rem-actions">
+    {% if m.reminder_status == 'done' %}
+      <span class="pill pill-done"><span class="dot"></span>Completed</span>
+      <button class="btn btn-ghost btn-sm" type="button" data-reminder="{{ m.reminder_id }}" data-status="pending">Undo</button>
+    {% else %}
+      {{ urgency_pill(m.urgency) }}
+      <button class="btn btn-sm" type="button" data-reminder="{{ m.reminder_id }}" data-status="done" aria-label="Mark reminder for {{ m.title }} as done">{{ icon('check') }}Done</button>
+    {% endif %}
+    <a class="icon-btn" href="{{ url_for('memory_detail', memory_id=m.id) }}" aria-label="Open {{ m.title }}">{{ icon('chevron') }}</a>
+  </div>
+</div>
+{%- endmacro %}
+
+{% block content %}
+<header class="page-head">
+  <div>
+    <p class="eyebrow">Reminders</p>
+    <h1 class="page-title">What's coming up</h1>
+    <p class="page-sub">ECHO reminds you ahead of time, using a lead time that fits each kind of memory.</p>
+  </div>
+</header>
+
+{% set sections = [('attention','Needs attention','alert','Overdue, due today, or within 7 days'),
+                   ('upcoming','Upcoming','calendar','Within 30 days, or inside the reminder window'),
+                   ('later','Later','clock','More than 30 days away'),
+                   ('completed','Completed','check','Reminders you marked as done')] %}
+{% if groups.attention or groups.upcoming or groups.later or groups.completed %}
+  {% for key, label, ic, hint in sections %}
+  <section class="rem-section" aria-labelledby="sec-{{ key }}">
+    <div class="rem-section-head">
+      <h2 id="sec-{{ key }}">{{ label }}</h2><span class="count">{{ groups[key]|length }}</span>
+      <span class="muted" style="font-size:12px">{{ hint }}</span>
+    </div>
+    {% if groups[key] %}
+    <div class="rem-list">{% for m in groups[key] %}{{ rem_item(m) }}{% endfor %}</div>
+    {% else %}
+    <p class="rem-empty">Nothing here right now.</p>
+    {% endif %}
+  </section>
+  {% endfor %}
+{% else %}
+  {{ empty_state("No reminders yet", "When ECHO finds a reliable date in something you scan, it creates a reminder automatically.", url_for('scan'), "Scan something", 'bell') }}
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('[data-reminder]').forEach(btn => btn.addEventListener('click', async () => {
+  const res = await Echo.api(`/api/reminder/${btn.dataset.reminder}/status`, { method: 'POST', body: { status: btn.dataset.status } });
+  if (res.ok) { Echo.toast(btn.dataset.status === 'done' ? 'Reminder completed.' : 'Reminder restored.'); setTimeout(() => location.reload(), 500); }
+}));
+</script>
+{% endblock %}

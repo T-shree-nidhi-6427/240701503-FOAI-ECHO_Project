@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, cat_badge, urgency_pill %}
+{% block title %}{{ memory.title }}{% endblock %}
+{% block content %}
+<a class="section-link" href="{{ url_for('memories_page') }}" style="margin-bottom:18px; display:inline-flex">
+  <svg class="icon" style="transform:rotate(180deg)"><use href="#i-chevron"></use></svg>All memories</a>
+
+<header class="detail-head">
+  {{ cat_badge(memory.category) }}
+  <div style="min-width:0">
+    <p class="muted">{{ memory.category_label }}
+      {% if memory.is_demo %}<span class="badge badge-demo" style="margin-left:6px">Demo data</span>{% endif %}
+      {% if memory.source == 'demo_text' and not memory.is_demo %}<span class="badge" style="margin-left:6px">From demo text</span>{% endif %}</p>
+    <h1 class="detail-title">{{ memory.title }}</h1>
+  </div>
+  <div class="detail-actions">
+    <button class="btn" type="button" id="editMemoryBtn">{{ icon('edit') }}Edit memory</button>
+    <button class="btn btn-danger" type="button" id="deleteMemoryBtn">{{ icon('trash') }}Delete</button>
+  </div>
+</header>
+
+<div class="detail-grid" data-memory-id="{{ memory.id }}">
+  <div class="stack">
+    <div class="card">
+      <h2 class="card-title">{{ icon('calendar') }}{{ memory.date_label }}</h2>
+      {% if memory.important_date %}
+      <div class="key-date" style="margin-top:0">
+        {{ icon('clock') }}
+        <div><p class="key-date-value">{{ memory.important_date|long_date }}</p>
+          <p class="key-date-sub">{{ memory.relative }} · {{ memory.event_phrase|capitalize }}</p></div>
+        <div style="margin-left:auto">{{ urgency_pill(memory.urgency, memory.status_label) }}</div>
+      </div>
+      {% if memory.date_method %}<p class="muted" style="font-size:13px">How ECHO got this date: {{ memory.date_method }}</p>{% endif %}
+      {% else %}
+      <p class="muted">No important date is set, so ECHO has no reminder for this memory. Use <strong>Edit memory</strong> to add one.</p>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">{{ icon('layers') }}Extracted information</h2>
+      {% if memory.extracted_fields %}
+      <dl class="kv">
+        {% for k, v in memory.extracted_fields.items() %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}
+      </dl>
+      {% else %}<p class="muted">No additional details were extracted.</p>{% endif %}
+      {% if memory.description %}<p class="muted" style="margin-top:14px; font-size:13px">{{ memory.description }}</p>{% endif %}
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">{{ icon('image') }}Original capture</h2>
+      {% if memory.image_path %}
+      <div class="detail-image"><img src="{{ url_for('static', filename=memory.image_path) }}" alt="Original photo of {{ memory.title }}"></div>
+      {% else %}
+      <div class="no-image">{{ icon('text') }}{% if memory.source == 'demo_text' %}Created from demo text input, not from a photo.{% else %}No image stored.{% endif %}</div>
+      {% endif %}
+      {% if memory.extracted_text %}
+      <details style="margin-top:14px"><summary>{{ 'Text ECHO read from the image' if memory.source == 'image' else 'Demo text used' }}</summary>
+        <div class="ocr-text">{{ memory.extracted_text }}</div></details>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <h2 class="card-title">{{ icon('bell') }}Reminder</h2>
+      {% if memory.reminder_id %}
+      <p><strong>{{ memory.reminder_date|long_date }}</strong></p>
+      <p class="muted" style="font-size:13px">{{ memory.days_before }} day{{ '' if memory.days_before == 1 else 's' }} before · {{ memory.reminder_date|relative }}
+        {% if memory.reminder_status == 'done' %} · Completed{% endif %}</p>
+      {% elif memory.important_date and memory.days_remaining is not none and memory.days_remaining < 0 %}
+      <p class="muted">This date has passed, so there is no active reminder.</p>
+      {% else %}
+      <p class="muted">No reminder yet.</p>
+      {% endif %}
+      {% if memory.important_date and memory.days_remaining is not none and memory.days_remaining >= 0 %}
+      <form class="reminder-control" id="reminderForm">
+        <label for="daysBefore" class="muted" style="font-size:13px">Remind me</label>
+        <input class="input" type="number" id="daysBefore" min="0" max="365" value="{{ memory.days_before if memory.days_before is not none else settings.reminder_rules.get(memory.category, 7) }}">
+        <span class="muted" style="font-size:13px">days before</span>
+        <button class="btn btn-sm" type="submit">{{ icon('check') }}Change reminder</button>
+      </form>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">{{ icon('sparkle') }}Why ECHO remembered this</h2>
+      {% if memory.explanation %}
+      <ul class="explain">{% for line in memory.explanation %}<li>{{ line }}</li>{% endfor %}</ul>
+      {% else %}<p class="muted">Saved manually.</p>{% endif %}
+      {% if memory.confidence %}<p class="muted" style="font-size:12px; margin-top:12px">Confidence at capture: {{ (memory.confidence * 100)|round|int }}%</p>{% endif %}
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">{{ icon('clock') }}Timeline</h2>
+      <ol class="timeline">
+        <li><span class="t-dot"></span><p class="t-title">Captured</p><p class="t-sub">{{ memory.created_at[:10]|long_date }} · {{ 'Photo' if memory.source == 'image' else 'Demo text' }}</p></li>
+        <li><span class="t-dot"></span><p class="t-title">Understood</p><p class="t-sub">Classified as {{ memory.category_label|lower }}</p></li>
+        <li><span class="t-dot {{ 'teal' if memory.reminder_id else 'muted' }}"></span><p class="t-title">{{ 'Reminder created' if memory.reminder_id else 'No reminder' }}</p>
+          <p class="t-sub">{% if memory.reminder_id %}Fires on {{ memory.reminder_date|long_date }}{% else %}No reliable future date{% endif %}</p></li>
+        {% if memory.important_date %}
+        <li><span class="t-dot {{ 'teal' if memory.days_remaining >= 0 else 'muted' }}"></span><p class="t-title">{{ memory.date_label }}</p><p class="t-sub">{{ memory.important_date|long_date }}</p></li>
+        {% endif %}
+      </ol>
+    </div>
+  </div>
+</div>
+
+<template id="editTemplate">
+  <label class="field">Title<input class="input" name="title" value="{{ memory.title }}" maxlength="120" required></label>
+  <label class="field">Category
+    <select class="select" name="category">
+      {% for key, label in category_labels.items() %}<option value="{{ key }}" {% if key == memory.category %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></label>
+  <label class="field">{{ memory.date_label }}<input class="input" type="date" name="important_date" value="{{ memory.important_date or '' }}"></label>
+  <label class="field">Note<textarea class="textarea" name="description" rows="3" maxlength="500">{{ memory.description or '' }}</textarea></label>
+</template>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const id = document.querySelector('[data-memory-id]').dataset.memoryId;
+  document.getElementById('deleteMemoryBtn').addEventListener('click', () => {
+    Echo.confirm('Delete this memory?', 'This removes the memory, its reminder and any stored image. This can\'t be undone.', 'Delete', async () => {
+      const res = await Echo.api(`/api/memory/${id}`, { method: 'DELETE' });
+      if (res.ok) { Echo.toast('Memory deleted.'); setTimeout(() => location.href = '/memories', 600); }
+    }, true);
+  });
+  document.getElementById('editMemoryBtn').addEventListener('click', () => {
+    const body = document.getElementById('editTemplate').content.cloneNode(true);
+    Echo.openModal('Edit memory', body, [
+      { label: 'Cancel', cls: 'btn-ghost', close: true },
+      { label: 'Save changes', cls: 'btn-primary', action: async (modal) => {
+          const f = modal.querySelector('.modal-body');
+          const payload = {
+            title: f.querySelector('[name=title]').value, category: f.querySelector('[name=category]').value,
+            important_date: f.querySelector('[name=important_date]').value, description: f.querySelector('[name=description]').value,
+          };
+          const res = await Echo.api(`/api/memory/${id}`, { method: 'PUT', body: payload });
+          if (res.ok) { Echo.toast('Memory updated.'); setTimeout(() => location.reload(), 500); return true; }
+          return false;
+        } },
+    ]);
+  });
+  const form = document.getElementById('reminderForm');
+  if (form) form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const res = await Echo.api('/api/reminder', { method: 'POST', body: { memory_id: Number(id), days_before: Number(document.getElementById('daysBefore').value) } });
+    if (res.ok) { Echo.toast(res.note ? res.note : `Reminder set for ${res.reminder_date_display}.`); setTimeout(() => location.reload(), 900); }
+  });
+})();
+</script>
+{% endblock %}

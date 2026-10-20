@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, memory_card, attention_row, empty_state %}
+{% block title %}Overview{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1 class="page-title" id="greeting">Good evening.</h1>
+    <p class="page-sub">Let's make sure nothing important slips through.</p>
+  </div>
+</header>
+
+<section class="hero" aria-labelledby="heroTitle">
+  <div>
+    <p class="eyebrow">Capture once. Remember automatically.</p>
+    <h2 id="heroTitle">Capture something important</h2>
+    <p>Let ECHO understand it for you. Snap a warranty card, a food label, a receipt or a renewal notice and ECHO works out what matters and when.</p>
+  </div>
+  <div class="hero-rings" aria-hidden="true"><span></span><span></span><span></span></div>
+  <a class="btn btn-primary" href="{{ url_for('scan') }}">{{ icon('plus') }}Scan something</a>
+</section>
+
+<section class="stats" aria-label="Summary">
+  <div class="card stat">
+    <span class="stat-icon">{{ icon('layers') }}</span>
+    <div><p class="stat-label">Memories</p><p class="stat-value">{{ stats.memories }}</p></div>
+  </div>
+  <div class="card stat">
+    <span class="stat-icon teal">{{ icon('calendar') }}</span>
+    <div><p class="stat-label">Upcoming</p><p class="stat-value">{{ stats.upcoming }}</p></div>
+  </div>
+  <div class="card stat">
+    <span class="stat-icon warn">{{ icon('alert') }}</span>
+    <div><p class="stat-label">Needs attention</p><p class="stat-value">{{ stats.attention }}</p></div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="attnTitle">
+  <div class="section-head">
+    <h2 class="section-title" id="attnTitle">Needs your attention</h2>
+    <a class="section-link" href="{{ url_for('reminders_page') }}">All reminders {{ icon('chevron') }}</a>
+  </div>
+  {% if attention %}
+  <div class="attention-list">
+    {% for m in attention %}{{ attention_row(m) }}{% endfor %}
+  </div>
+  {% else %}
+  {{ empty_state("You're all caught up", "Nothing is due in the next 30 days. ECHO will bring things back here when they matter.", icon_name='check') }}
+  {% endif %}
+</section>
+
+<section class="section" aria-labelledby="recentTitle">
+  <div class="section-head">
+    <h2 class="section-title" id="recentTitle">Recent memories</h2>
+    <a class="section-link" href="{{ url_for('memories_page') }}">View all {{ icon('chevron') }}</a>
+  </div>
+  {% if memories %}
+  <div class="memory-grid">
+    {% for m in memories %}{{ memory_card(m) }}{% endfor %}
+  </div>
+  {% else %}
+  {{ empty_state("No memories yet", "Scan your first item, or load the demo data from Settings to explore ECHO.", url_for('scan'), "Scan something", 'layers') }}
+  {% endif %}
+</section>
+
+<section class="section" aria-labelledby="askTitle">
+  <div class="section-head">
+    <h2 class="section-title" id="askTitle">Ask ECHO</h2>
+    <a class="section-link" href="{{ url_for('ask_page') }}">Open {{ icon('chevron') }}</a>
+  </div>
+  <form class="ask-compact" action="{{ url_for('ask_page') }}" method="get" role="search">
+    {{ icon('sparkle') }}
+    <label for="quickAsk" class="visually-hidden">Ask ECHO</label>
+    <input id="quickAsk" name="q" type="text" placeholder="What do you want to remember? Try “What needs my attention?”" autocomplete="off">
+    <button class="btn btn-primary btn-sm" type="submit">{{ icon('send') }}Ask</button>
+  </form>
+  <div class="chips">
+    {% for s in suggestions %}<a class="chip" href="{{ url_for('ask_page', q=s) }}">{{ s }}</a>{% endfor %}
+  </div>
+</section>
+{% endblock %}

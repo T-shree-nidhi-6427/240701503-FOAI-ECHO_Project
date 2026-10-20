@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Ask ECHO{% endblock %}
+{% block content %}
+<div class="ask-wrap">
+  <header class="page-head" style="margin-bottom:16px">
+    <div>
+      <p class="eyebrow">Ask ECHO</p>
+      <h1 class="page-title">Your memories, when you need them.</h1>
+    </div>
+  </header>
+
+  <div class="chat" id="chat" aria-live="polite">
+    <div class="msg">
+      <span class="avatar"><img src="{{ url_for('static', filename='images/logo.svg') }}" alt=""></span>
+      <div class="bubble"><p class="label">ECHO</p>
+        Ask about what's coming up, what has expired, or a category such as warranties, food or subscriptions.
+        I only answer from the memories saved on this computer.
+        <div class="chips">{% for s in suggestions %}<button class="chip" type="button" data-q="{{ s }}">{{ s }}</button>{% endfor %}</div>
+      </div>
+    </div>
+  </div>
+
+  <form class="composer" id="askForm" autocomplete="off">
+    <label for="askInput" class="visually-hidden">Ask ECHO a question</label>
+    <input id="askInput" type="text" maxlength="300" placeholder="Ask anything, e.g. “What expires soon?”">
+    <button class="btn btn-primary" type="submit">{{ icon('send') }}<span>Ask</span></button>
+  </form>
+  <p class="ask-note">Ask ECHO uses keyword-based intent matching over your local database. It isn't a person and it doesn't give medical advice.</p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/ask.js') }}"></script>
+{% endblock %}
